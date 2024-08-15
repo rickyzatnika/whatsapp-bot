@@ -170,24 +170,60 @@ const connectToWhatsApp = async () => {
 
   sock.ev.on("creds.update", saveCreds);
 
+  // Tentukan nomor pemilik WhatsApp
+  const ownerNumber = "your-owner-number@s.whatsapp.net"; // Ganti dengan nomor pemilik WhatsApp
+
+  // Buat objek untuk menyimpan status pengguna
+  const userStatus = {};
+
+  // Durasi waktu setelah pengguna memilih "tidak" (dalam milidetik)
+  const muteDuration = 60 * 60 * 1000; // 1 jam
+
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     const phone = msg.key.remoteJid;
+
+    // Periksa apakah pengirim pesan adalah pemilik WhatsApp
+    if (phone === ownerNumber) {
+      // Jika pengirim adalah pemilik, tidak ada tindakan yang dilakukan
+      console.log("Pesan dari pemilik, tidak direspons oleh AI.");
+      return;
+    }
 
     if (msg.message.conversation) {
       const pesan = msg.message.conversation;
       console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
 
       try {
-        // Periksa status pengirim
+        // Periksa apakah pengguna sebelumnya sudah memilih untuk tidak berbicara dengan AI
+        if (userStatus[phone] && userStatus[phone].muteUntil > Date.now()) {
+          console.log(
+            `Pengguna ${phone} telah memilih untuk tidak berbicara dengan AI.`
+          );
+          return;
+        }
+
+        // Jika ini adalah pesan pertama dari pengguna
         if (!userStatus[phone]) {
-          // Pesan pertama
+          // Tanyakan apakah pengguna ingin berbicara dengan AI
           userStatus[phone] = { firstMessageSent: true };
           const response =
-            "Hallo saya AI Ampas, saat ini Ricky masih tidur. Jika ingin menunggu saya bersedia menemani, silahkan tanyakan pertanyaan apapun atau apakah anda ingin saya membantu dengan sesuatu yang lain? Misalnya, apakah anda ingin saya:\n- Mencari informasi tentang topik tertentu?\n- Membuat naskah, novel, artikel atau cerpen\n- Membuat berbagai resep makanan\n- Memberi solusi tentang masalah yang sedang anda alami\n\nSilahkan beri tahu saya apa yang ingin Anda lakukan. Saya siap membantu!😊";
+            "Apakah Anda ingin chat dengan AI? Balas dengan 'ya' untuk berbicara dengan AI atau 'tidak' jika tidak ingin direspons oleh AI.";
           await sock.sendMessage(phone, { text: response });
+        } else if (!userStatus[phone].aiEnabled) {
+          // Periksa jawaban pengguna
+          if (pesan.toLowerCase() === "ya") {
+            userStatus[phone].aiEnabled = true;
+            const welcomeMessage =
+              "Baik, Anda sekarang bisa berbicara dengan AI. Apa yang bisa saya bantu?😊";
+            await sock.sendMessage(phone, { text: welcomeMessage });
+          } else if (pesan.toLowerCase() === "tidak") {
+            userStatus[phone].muteUntil = Date.now() + muteDuration;
+            const goodbyeMessage = "Oke , see u next time.";
+            await sock.sendMessage(phone, { text: goodbyeMessage });
+          }
         } else {
-          // Pesan berikutnya
+          // Jika pengguna telah memilih untuk berbicara dengan AI
           const aiResponse = await run(pesan);
           await sock.sendMessage(phone, { text: aiResponse });
         }
@@ -199,6 +235,36 @@ const connectToWhatsApp = async () => {
       }
     }
   });
+
+  // sock.ev.on("messages.upsert", async ({ messages }) => {
+  //   const msg = messages[0];
+  //   const phone = msg.key.remoteJid;
+
+  //   if (msg.message.conversation) {
+  //     const pesan = msg.message.conversation;
+  //     console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
+
+  //     try {
+  //       // Periksa status pengirim
+  //       if (!userStatus[phone]) {
+  //         // Pesan pertama
+  //         userStatus[phone] = { firstMessageSent: true };
+  //         const response =
+  //           "Hallo saya AI Ampas, saat ini Ricky masih tidur. Jika ingin menunggu saya bersedia menemani, silahkan tanyakan pertanyaan apapun atau apakah anda ingin saya membantu dengan sesuatu yang lain? Misalnya, apakah anda ingin saya:\n- Mencari informasi tentang topik tertentu?\n- Membuat naskah, novel, artikel atau cerpen\n- Membuat berbagai resep makanan\n- Memberi solusi tentang masalah yang sedang anda alami\n\nSilahkan beri tahu saya apa yang ingin Anda lakukan. Saya siap membantu!😊";
+  //         await sock.sendMessage(phone, { text: response });
+  //       } else {
+  //         // Pesan berikutnya
+  //         const aiResponse = await run(pesan);
+  //         await sock.sendMessage(phone, { text: aiResponse });
+  //       }
+  //     } catch (error) {
+  //       console.error("Error processing message:", error);
+  //       await sock.sendMessage(phone, {
+  //         text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
+  //       });
+  //     }
+  //   }
+  // });
 };
 
 // Socket.io Connection
