@@ -84,6 +84,10 @@ const store = makeInMemoryStore({
   logger: P().child({ level: "silent", stream: "store" }),
 });
 
+let sock;
+let qrCode;
+let currentSocket;
+
 async function run(prompt) {
   try {
     console.log("Sending request to AI with prompt:", prompt);
@@ -110,7 +114,6 @@ async function run(prompt) {
 }
 
 // Fungsi untuk menghapus folder session secara otomatis
-
 const deleteSessionFolder = (folderPath) => {
   if (fs.existsSync(folderPath)) {
     fs.rmSync(folderPath, { recursive: true, force: true });
@@ -120,17 +123,13 @@ const deleteSessionFolder = (folderPath) => {
   }
 };
 
-let sock;
-let qrCode = null;
-let currentSocket;
-let isScanning = false;
 // WhatsApp Connection Function
-
 const connectToWhatsApp = async () => {
   // Path folder session
   const sessionFolderPath = path.join(__dirname, "baileys_auth_info");
 
-  if (fs.existsSync(sessionFolderPath)) {
+  // Only delete the folder if there’s a reason to reset the session
+  if (!fs.existsSync(sessionFolderPath)) {
     deleteSessionFolder(sessionFolderPath);
   }
 
@@ -144,7 +143,6 @@ const connectToWhatsApp = async () => {
     version,
     shouldIgnoreJid: (jid) => isJidBroadcast(jid),
   });
-
   store.bind(sock.ev);
 
   sock.ev.on("connection.update", async (update) => {
@@ -152,34 +150,54 @@ const connectToWhatsApp = async () => {
 
     if (qr) {
       qrCode = qr;
-      if (!isScanning) {
-        isScanning = true;
-        updateQR("qr");
-      }
+      updateQR("qr");
     }
 
     if (connection === "close") {
-      const shouldReconnect =
-        (lastDisconnect.error && lastDisconnect.error.output?.statusCode) !==
-        DisconnectReason.loggedOut;
-      if (shouldReconnect) {
-        console.log("Reconnecting...");
-        setTimeout(connectToWhatsApp, 5000); // Attempt reconnection after 5 seconds
-      } else {
-        console.log("WhatsApp logged out, session needs resetting.");
-        deleteSessionFolder(sessionFolderPath); // Clean up the session
-        qrCode = null; // Clear qrCode
-        isScanning = false; // Reset scanning flag
-        if (currentSocket) {
-          updateQR("loading"); // Notify client to wait for QR code
-        }
+      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+
+      switch (reason) {
+        case DisconnectReason.badSession:
+          console.log(`Bad Session File, Please Delete session and Scan Again`);
+          await sock.logout();
+          break;
+        case DisconnectReason.connectionClosed:
+          console.log("Connection closed, reconnecting....");
+          connectToWhatsApp();
+          break;
+        case DisconnectReason.connectionLost:
+          console.log("Connection Lost from Server, reconnecting...");
+          connectToWhatsApp();
+          break;
+        case DisconnectReason.connectionReplaced:
+          console.log(
+            "Connection Replaced, Another New Session Opened, Please Close Current Session First"
+          );
+          await sock.logout();
+          break;
+        case DisconnectReason.loggedOut:
+          console.log(
+            `Device Logged Out, Please Delete session and Scan Again.`
+          );
+          await sock.logout();
+          break;
+        case DisconnectReason.restartRequired:
+          console.log("Restart Required, Restarting...");
+          connectToWhatsApp();
+          break;
+        case DisconnectReason.timedOut:
+          console.log("Connection TimedOut, Reconnecting...");
+          connectToWhatsApp();
+          break;
+        default:
+          console.log(
+            `Unknown DisconnectReason: ${reason}|${lastDisconnect?.error}`
+          );
+          await sock.end();
       }
     } else if (connection === "open") {
-      console.log("Connected to WhatsApp");
-      if (currentSocket) {
-        updateQR("connected");
-        isScanning = false; // Reset scanning flag upon successful connection
-      }
+      console.log("WhatsApp connected");
+      updateQR("connected");
     }
   });
 
@@ -282,20 +300,25 @@ const connectToWhatsApp = async () => {
 };
 
 // Socket.io Connection
-// io.on("connection", (socket) => {
-//   currentSocket = socket;
-//   if (isConnected()) {
-//     updateQR("connected");
-//   } else if (qrCode) {
-//     updateQR("qr");
-//   }
+io.on("connection", (socket) => {
+  currentSocket = socket;
+  if (isConnected()) {
+    updateQR("connected");
+  } else if (qrCode) {
+    updateQR("qr");
+  }
 
-//   socket.on("disconnect", () => {
-//     console.log("User disconnected");
-//   });
-// });
+  socket.on("disconnect", () => {
+    console.log("User disconnected");
+  });
+});
+
+// Helper Functions
+const isConnected = () => {
+  return !!sock?.user;
+};
+
 const updateQR = (status) => {
-  if (!currentSocket) return; // Do nothing if no socket
   switch (status) {
     case "qr":
       qrcode.toDataURL(qrCode, (err, url) => {
@@ -322,26 +345,6 @@ const updateQR = (status) => {
     default:
       break;
   }
-};
-
-// Socket.io Connection
-io.on("connection", (socket) => {
-  currentSocket = socket;
-  if (isConnected()) {
-    updateQR("connected");
-  } else if (qrCode) {
-    updateQR("qr");
-  }
-
-  socket.on("disconnect", () => {
-    console.log("User disconnected");
-    currentSocket = null; // Clear currentSocket on disconnect
-  });
-});
-
-// Helper Functions
-const isConnected = () => {
-  return !!sock?.user;
 };
 
 // Send Text Message to WhatsApp User
