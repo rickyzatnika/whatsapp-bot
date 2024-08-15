@@ -317,8 +317,20 @@ const updateQR = (status) => {
 
 // Send Text Message to WhatsApp User
 app.post("/send-message", async (req, res) => {
-  const { numbers, message } = req.body;
+  let { numbers, message } = req.body;
   const file = req.files?.file_dikirim;
+
+  // Parsing numbers jika masih berupa string
+  if (typeof numbers === "string") {
+    try {
+      numbers = JSON.parse(numbers);
+    } catch (error) {
+      return res.status(400).json({
+        status: false,
+        response: "Format daftar nomor WA tidak valid!",
+      });
+    }
+  }
 
   if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
     return res.status(400).json({
