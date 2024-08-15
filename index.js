@@ -84,10 +84,6 @@ const store = makeInMemoryStore({
   logger: P().child({ level: "silent", stream: "store" }),
 });
 
-let sock;
-let qrCode;
-let currentSocket;
-
 async function run(prompt) {
   try {
     console.log("Sending request to AI with prompt:", prompt);
@@ -124,12 +120,16 @@ const deleteSessionFolder = (folderPath) => {
   }
 };
 
+let sock;
+let qrCode;
+let currentSocket;
+let isScanning = false;
 // WhatsApp Connection Function
+
 const connectToWhatsApp = async () => {
   // Path folder session
   const sessionFolderPath = path.join(__dirname, "baileys_auth_info");
 
-  // Hapus folder session jika ada
   if (fs.existsSync(sessionFolderPath)) {
     deleteSessionFolder(sessionFolderPath);
   }
@@ -152,7 +152,10 @@ const connectToWhatsApp = async () => {
 
     if (qr) {
       qrCode = qr;
-      updateQR("qr");
+      if (!isScanning) {
+        isScanning = true;
+        updateQR("qr");
+      }
     }
 
     if (connection === "close") {
@@ -166,13 +169,17 @@ const connectToWhatsApp = async () => {
         console.log("WhatsApp logged out, session needs resetting.");
         deleteSessionFolder(sessionFolderPath); // Clean up the session
         qrCode = null; // Clear qrCode
+        isScanning = false; // Reset scanning flag
         if (currentSocket) {
           updateQR("loading"); // Notify client to wait for QR code
         }
       }
     } else if (connection === "open") {
       console.log("Connected to WhatsApp");
-      if (currentSocket) updateQR("connected");
+      if (currentSocket) {
+        updateQR("connected");
+        isScanning = false; // Reset scanning flag upon successful connection
+      }
     }
   });
 
