@@ -129,8 +129,8 @@ const connectToWhatsApp = async () => {
   // Path folder session
   const sessionFolderPath = path.join(__dirname, "baileys_auth_info");
 
-  // Only delete the session folder if it’s not already created or if you want to reset the session
-  if (!fs.existsSync(sessionFolderPath)) {
+  // Hapus folder session jika ada
+  if (fs.existsSync(sessionFolderPath)) {
     deleteSessionFolder(sessionFolderPath);
   }
 
@@ -144,6 +144,7 @@ const connectToWhatsApp = async () => {
     version,
     shouldIgnoreJid: (jid) => isJidBroadcast(jid),
   });
+
   store.bind(sock.ev);
 
   sock.ev.on("connection.update", async (update) => {
@@ -159,10 +160,15 @@ const connectToWhatsApp = async () => {
         (lastDisconnect.error && lastDisconnect.error.output?.statusCode) !==
         DisconnectReason.loggedOut;
       if (shouldReconnect) {
-        connectToWhatsApp(); // Attempt reconnection
+        console.log("Reconnecting...");
+        setTimeout(connectToWhatsApp, 5000); // Attempt reconnection after 5 seconds
       } else {
         console.log("WhatsApp logged out, session needs resetting.");
         deleteSessionFolder(sessionFolderPath); // Clean up the session
+        qrCode = null; // Clear qrCode
+        if (currentSocket) {
+          updateQR("loading"); // Notify client to wait for QR code
+        }
       }
     } else if (connection === "open") {
       console.log("Connected to WhatsApp");
@@ -288,6 +294,7 @@ const isConnected = () => {
 };
 
 const updateQR = (status) => {
+  if (!currentSocket) return; // Do nothing if no socket
   switch (status) {
     case "qr":
       qrcode.toDataURL(qrCode, (err, url) => {
