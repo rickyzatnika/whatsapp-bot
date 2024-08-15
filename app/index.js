@@ -64,11 +64,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
 app.get("/scan", (req, res) => {
-  res.sendFile(path.join(__dirname, "../client", "server.html"));
+  res.sendFile(path.join(__dirname, "../client/server.html"));
 });
 
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "../client", "index.html"));
+  res.sendFile(path.join(__dirname, "../client/index.html"));
 });
 
 // Utility Functions
@@ -192,15 +192,15 @@ const updateQR = (status) => {
       });
       break;
     case "connected":
-      currentSocket?.emit("qrstatus", "../assets/check.svg");
+      currentSocket?.emit("qrstatus", "../client/assets/check.svg");
       currentSocket?.emit("log", "WhatsApp terhubung!");
       break;
     case "qrscanned":
-      currentSocket?.emit("qrstatus", "../assets/check.svg");
+      currentSocket?.emit("qrstatus", "../client/assets/check.svg");
       currentSocket?.emit("log", "QR Code Telah discan!");
       break;
     case "loading":
-      currentSocket?.emit("qrstatus", "../assets/loader.gif");
+      currentSocket?.emit("qrstatus", "../client/assets/loader.gif");
       currentSocket?.emit("log", "Registering QR Code, please wait!");
       break;
     default:
