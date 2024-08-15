@@ -40,7 +40,25 @@ app.use(
     createParentPath: true,
   })
 );
-app.use(cors());
+// Daftar domain yang diizinkan
+const allowedOrigins = [
+  "https://barland.vercel.app", // HTTPS
+  "http://localhost:3000", // Localhost dengan HTTP
+  "http://localhost:5000",
+];
+
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+        // Jika origin ada dalam daftar yang diizinkan atau tidak ada origin (misalnya untuk permintaan dari server ke server)
+        callback(null, true);
+      } else {
+        callback(new Error("Not allowed by CORS"));
+      }
+    },
+  })
+);
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
@@ -365,6 +383,12 @@ app.post("/send-message", async (req, res) => {
           "uploads",
           `${Date.now()}_${file.name}`
         );
+
+        // Cek apakah direktori 'uploads' ada
+        if (!fs.existsSync(path.join(__dirname, "uploads"))) {
+          fs.mkdirSync(path.join(__dirname, "uploads"), { recursive: true });
+        }
+
         await file.mv(uploadPath);
 
         const mimeType = file.mimetype;
@@ -372,12 +396,12 @@ app.post("/send-message", async (req, res) => {
 
         if ([".jpeg", ".jpg", ".png", ".gif"].includes(extension)) {
           options = {
-            image: { url: uploadPath },
+            image: { url: uploadPath }, // Jika pengiriman menggunakan path file, sesuaikan di sini
             caption: message,
           };
         } else if ([".mp3", ".ogg"].includes(extension)) {
           options = {
-            audio: { url: uploadPath },
+            audio: { url: uploadPath }, // Pastikan path sesuai dengan sistem Railway
             mimetype: mimeType,
             ptt: true,
           };
@@ -390,6 +414,7 @@ app.post("/send-message", async (req, res) => {
           };
         }
 
+        // Hapus file setelah dikirim
         fs.unlink(uploadPath, (err) => {
           if (err) console.error("Error deleting file: ", err);
         });
