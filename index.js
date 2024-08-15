@@ -121,7 +121,7 @@ const deleteSessionFolder = (folderPath) => {
 };
 
 let sock;
-let qrCode;
+let qrCode = null;
 let currentSocket;
 let isScanning = false;
 // WhatsApp Connection Function
@@ -282,24 +282,18 @@ const connectToWhatsApp = async () => {
 };
 
 // Socket.io Connection
-io.on("connection", (socket) => {
-  currentSocket = socket;
-  if (isConnected()) {
-    updateQR("connected");
-  } else if (qrCode) {
-    updateQR("qr");
-  }
+// io.on("connection", (socket) => {
+//   currentSocket = socket;
+//   if (isConnected()) {
+//     updateQR("connected");
+//   } else if (qrCode) {
+//     updateQR("qr");
+//   }
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected");
-  });
-});
-
-// Helper Functions
-const isConnected = () => {
-  return !!sock?.user;
-};
-
+//   socket.on("disconnect", () => {
+//     console.log("User disconnected");
+//   });
+// });
 const updateQR = (status) => {
   if (!currentSocket) return; // Do nothing if no socket
   switch (status) {
@@ -328,6 +322,26 @@ const updateQR = (status) => {
     default:
       break;
   }
+};
+
+// Socket.io Connection
+io.on("connection", (socket) => {
+  currentSocket = socket;
+  if (isConnected()) {
+    updateQR("connected");
+  } else if (qrCode) {
+    updateQR("qr");
+  }
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected");
+    currentSocket = null; // Clear currentSocket on disconnect
+  });
+});
+
+// Helper Functions
+const isConnected = () => {
+  return !!sock?.user;
 };
 
 // Send Text Message to WhatsApp User
