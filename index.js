@@ -392,16 +392,14 @@ app.post("/send-message", async (req, res) => {
 
       if (file) {
         // Handle File Upload
-        const uploadPath = path.join(
-          __dirname,
-          "uploads",
-          `${Date.now()}_${file.name}`
-        );
+        const uploadDir = path.join(__dirname, "uploads");
 
         // Cek apakah direktori 'uploads' ada
-        if (!fs.existsSync(path.join(__dirname, "uploads"))) {
-          fs.mkdirSync(path.join(__dirname, "uploads"), { recursive: true });
+        if (!fs.existsSync(uploadDir)) {
+          fs.mkdirSync(uploadDir, { recursive: true });
         }
+
+        const uploadPath = path.join(uploadDir, `${Date.now()}_${file.name}`);
 
         await file.mv(uploadPath);
 
@@ -410,12 +408,12 @@ app.post("/send-message", async (req, res) => {
 
         if ([".jpeg", ".jpg", ".png", ".gif"].includes(extension)) {
           options = {
-            image: { url: uploadPath }, // Jika pengiriman menggunakan path file, sesuaikan di sini
+            image: { url: uploadPath },
             caption: message,
           };
         } else if ([".mp3", ".ogg"].includes(extension)) {
           options = {
-            audio: { url: uploadPath }, // Pastikan path sesuai dengan sistem Railway
+            audio: { url: uploadPath },
             mimetype: mimeType,
             ptt: true,
           };
