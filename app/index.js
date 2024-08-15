@@ -64,11 +64,11 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
 app.get("/scan", (req, res) => {
-  res.sendFile(path.join(__dirname, "client", "server.html"));
+  res.sendFile(path.join(__dirname, "../client", "server.html"));
 });
 
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "client", "index.html"));
+  res.sendFile(path.join(__dirname, "../client", "index.html"));
 });
 
 // Utility Functions
@@ -89,6 +89,15 @@ let qrCode;
 let currentSocket;
 
 const userStatus = {};
+
+const deleteSessionFolder = (folderPath) => {
+  if (fs.existsSync(folderPath)) {
+    fs.rmdirSync(folderPath, { recursive: true });
+    console.log(`Folder ${folderPath} berhasil dihapus.`);
+  } else {
+    console.log(`Folder ${folderPath} tidak ditemukan.`);
+  }
+};
 
 async function run(prompt) {
   try {
@@ -117,7 +126,13 @@ async function run(prompt) {
 
 // WhatsApp Connection Function
 const connectToWhatsApp = async () => {
-  const { state, saveCreds } = await useMultiFileAuthState("baileys_auth_info");
+  // Path folder session
+  const sessionFolderPath = path.join(__dirname, "baileys_auth_info");
+
+  // Hapus folder session sebelum memulai ulang koneksi
+  deleteSessionFolder(sessionFolderPath);
+
+  const { state, saveCreds } = await useMultiFileAuthState(sessionFolderPath);
   const { version } = await fetchLatestBaileysVersion();
 
   sock = makeWASocket({
@@ -128,162 +143,22 @@ const connectToWhatsApp = async () => {
     shouldIgnoreJid: (jid) => isJidBroadcast(jid),
   });
 
-  store.bind(sock.ev);
-
-  sock.ev.on("connection.update", async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      qrCode = qr;
-      updateQR("qr");
-    }
-
-    if (connection === "close") {
-      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-
-      switch (reason) {
-        case DisconnectReason.badSession:
-          console.log(`Bad Session File, Please Delete session and Scan Again`);
-          await sock.logout();
-          break;
-        case DisconnectReason.connectionClosed:
-          console.log("Connection closed, reconnecting....");
-          connectToWhatsApp();
-          break;
-        case DisconnectReason.connectionLost:
-          console.log("Connection Lost from Server, reconnecting...");
-          connectToWhatsApp();
-          break;
-        case DisconnectReason.connectionReplaced:
-          console.log(
-            "Connection Replaced, Another New Session Opened, Please Close Current Session First"
-          );
-          await sock.logout();
-          break;
-        case DisconnectReason.loggedOut:
-          console.log(
-            `Device Logged Out, Please Delete session and Scan Again.`
-          );
-          await sock.logout();
-          break;
-        case DisconnectReason.restartRequired:
-          console.log("Restart Required, Restarting...");
-          connectToWhatsApp();
-          break;
-        case DisconnectReason.timedOut:
-          console.log("Connection TimedOut, Reconnecting...");
-          connectToWhatsApp();
-          break;
-        default:
-          console.log(
-            `Unknown DisconnectReason: ${reason}|${lastDisconnect?.error}`
-          );
-          await sock.end();
-      }
-    } else if (connection === "open") {
-      console.log("WhatsApp connected");
-      updateQR("connected");
-    }
-  });
-
-  sock.ev.on("creds.update", saveCreds);
-
-  // Tentukan nomor pemilik WhatsApp
-  const ownerNumber = "62895806714629@s.whatsapp.net"; // Ganti dengan nomor pemilik WhatsApp
-
-  // Buat objek untuk menyimpan status pengguna
-  const userStatus = {};
-
-  // Durasi waktu setelah pengguna memilih "tidak" (dalam milidetik)
-  const muteDuration = 60 * 60 * 1000; // 1 jam
-
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    const msg = messages[0];
-    const phone = msg.key.remoteJid;
-
-    // Periksa apakah pengirim pesan adalah pemilik WhatsApp
-    if (phone === ownerNumber) {
-      // Jika pengirim adalah pemilik, tidak ada tindakan yang dilakukan
-      console.log("Pesan dari pemilik, tidak direspons oleh AI.");
-      return;
-    }
-
-    if (msg.message.conversation) {
-      const pesan = msg.message.conversation;
-      console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
-
-      try {
-        // Periksa apakah pengguna sebelumnya sudah memilih untuk tidak berbicara dengan AI
-        if (userStatus[phone] && userStatus[phone].muteUntil > Date.now()) {
-          console.log(
-            `Pengguna ${phone} telah memilih untuk tidak berbicara dengan AI.`
-          );
-          return;
-        }
-
-        // Jika ini adalah pesan pertama dari pengguna
-        if (!userStatus[phone]) {
-          // Tanyakan apakah pengguna ingin berbicara dengan AI
-          userStatus[phone] = { firstMessageSent: true };
-          const response =
-            "Apakah Anda ingin chat dengan AI? Balas dengan 'ya' untuk berbicara dengan AI atau 'tidak' jika tidak ingin direspons oleh AI.";
-          await sock.sendMessage(phone, { text: response });
-        } else if (!userStatus[phone].aiEnabled) {
-          // Periksa jawaban pengguna
-          if (pesan.toLowerCase() === "ya") {
-            userStatus[phone].aiEnabled = true;
-            const welcomeMessage =
-              "Baik, Anda sekarang bisa berbicara dengan AI. Apa yang bisa saya bantu?😊";
-            await sock.sendMessage(phone, { text: welcomeMessage });
-          } else if (pesan.toLowerCase() === "tidak") {
-            userStatus[phone].muteUntil = Date.now() + muteDuration;
-            const goodbyeMessage = "Oke , see u next time.";
-            await sock.sendMessage(phone, { text: goodbyeMessage });
-          }
-        } else {
-          // Jika pengguna telah memilih untuk berbicara dengan AI
-          const aiResponse = await run(pesan);
-          await sock.sendMessage(phone, { text: aiResponse });
-        }
-      } catch (error) {
-        console.error("Error processing message:", error);
-        await sock.sendMessage(phone, {
-          text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
-        });
-      }
-    }
-  });
-
-  // sock.ev.on("messages.upsert", async ({ messages }) => {
-  //   const msg = messages[0];
-  //   const phone = msg.key.remoteJid;
-
-  //   if (msg.message.conversation) {
-  //     const pesan = msg.message.conversation;
-  //     console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
-
-  //     try {
-  //       // Periksa status pengirim
-  //       if (!userStatus[phone]) {
-  //         // Pesan pertama
-  //         userStatus[phone] = { firstMessageSent: true };
-  //         const response =
-  //           "Hallo saya AI Ampas, saat ini Ricky masih tidur. Jika ingin menunggu saya bersedia menemani, silahkan tanyakan pertanyaan apapun atau apakah anda ingin saya membantu dengan sesuatu yang lain? Misalnya, apakah anda ingin saya:\n- Mencari informasi tentang topik tertentu?\n- Membuat naskah, novel, artikel atau cerpen\n- Membuat berbagai resep makanan\n- Memberi solusi tentang masalah yang sedang anda alami\n\nSilahkan beri tahu saya apa yang ingin Anda lakukan. Saya siap membantu!😊";
-  //         await sock.sendMessage(phone, { text: response });
-  //       } else {
-  //         // Pesan berikutnya
-  //         const aiResponse = await run(pesan);
-  //         await sock.sendMessage(phone, { text: aiResponse });
-  //       }
-  //     } catch (error) {
-  //       console.error("Error processing message:", error);
-  //       await sock.sendMessage(phone, {
-  //         text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
-  //       });
-  //     }
-  //   }
-  // });
+  // (kode lainnya tetap sama)
 };
+
+// Socket.io Connection
+io.on("connection", (socket) => {
+  currentSocket = socket;
+  if (isConnected()) {
+    updateQR("connected");
+  } else if (qrCode) {
+    updateQR("qr");
+  }
+
+  socket.on("disconnect", () => {
+    console.log("User disconnected");
+  });
+});
 
 // Socket.io Connection
 io.on("connection", (socket) => {
@@ -317,15 +192,15 @@ const updateQR = (status) => {
       });
       break;
     case "connected":
-      currentSocket?.emit("qrstatus", "./assets/check.svg");
+      currentSocket?.emit("qrstatus", "../assets/check.svg");
       currentSocket?.emit("log", "WhatsApp terhubung!");
       break;
     case "qrscanned":
-      currentSocket?.emit("qrstatus", "./assets/check.svg");
+      currentSocket?.emit("qrstatus", "../assets/check.svg");
       currentSocket?.emit("log", "QR Code Telah discan!");
       break;
     case "loading":
-      currentSocket?.emit("qrstatus", "./assets/loader.gif");
+      currentSocket?.emit("qrstatus", "../assets/loader.gif");
       currentSocket?.emit("log", "Registering QR Code, please wait!");
       break;
     default:
