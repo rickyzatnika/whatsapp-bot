@@ -129,8 +129,10 @@ const connectToWhatsApp = async () => {
   // Path folder session
   const sessionFolderPath = path.join(__dirname, "baileys_auth_info");
 
-  // Hapus folder session sebelum memulai ulang koneksi
-  deleteSessionFolder(sessionFolderPath);
+  // Only delete the folder if there’s a reason to reset the session
+  if (!fs.existsSync(sessionFolderPath)) {
+    deleteSessionFolder(sessionFolderPath);
+  }
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolderPath);
   const { version } = await fetchLatestBaileysVersion();
