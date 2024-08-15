@@ -171,7 +171,7 @@ const connectToWhatsApp = async () => {
   sock.ev.on("creds.update", saveCreds);
 
   // Tentukan nomor pemilik WhatsApp
-  const ownerNumber = "62895806714629"; // Ganti dengan nomor pemilik WhatsApp
+  const ownerNumber = "62895806714629@s.whatsapp.net"; // Ganti dengan nomor pemilik WhatsApp
 
   // Buat objek untuk menyimpan status pengguna
   const userStatus = {};
