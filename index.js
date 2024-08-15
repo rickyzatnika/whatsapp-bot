@@ -114,9 +114,10 @@ async function run(prompt) {
 }
 
 // Fungsi untuk menghapus folder session secara otomatis
+
 const deleteSessionFolder = (folderPath) => {
   if (fs.existsSync(folderPath)) {
-    fs.rmdirSync(folderPath, { recursive: true });
+    fs.rmSync(folderPath, { recursive: true, force: true });
     console.log(`Folder ${folderPath} berhasil dihapus.`);
   } else {
     console.log(`Folder ${folderPath} tidak ditemukan.`);
