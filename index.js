@@ -319,6 +319,10 @@ const isConnected = () => {
 };
 
 const updateQR = (status) => {
+  if (!currentSocket) {
+    return;
+  }
+
   switch (status) {
     case "qr":
       qrcode.toDataURL(qrCode, (err, url) => {
@@ -391,15 +395,18 @@ app.post("/send-message", async (req, res) => {
       let options = {};
 
       if (file) {
+        const uploadPath = path.join(
+          __dirname,
+          "uploads",
+          `${Date.now()}_${file.name}`
+        );
+
         // Handle File Upload
-        const uploadDir = path.join(__dirname, "uploads");
 
         // Cek apakah direktori 'uploads' ada
-        if (!fs.existsSync(uploadDir)) {
-          fs.mkdirSync(uploadDir, { recursive: true });
+        if (!fs.existsSync(path.join(__dirname, "uploads"))) {
+          fs.mkdirSync(path.join(__dirname, "uploads"), { recursive: true });
         }
-
-        const uploadPath = path.join(uploadDir, `${Date.now()}_${file.name}`);
 
         await file.mv(uploadPath);
 
@@ -408,12 +415,12 @@ app.post("/send-message", async (req, res) => {
 
         if ([".jpeg", ".jpg", ".png", ".gif"].includes(extension)) {
           options = {
-            image: { url: uploadPath },
+            image: { url: uploadPath }, // Adjust if sending file path
             caption: message,
           };
         } else if ([".mp3", ".ogg"].includes(extension)) {
           options = {
-            audio: { url: uploadPath },
+            audio: { url: uploadPath }, // Ensure path is correct
             mimetype: mimeType,
             ptt: true,
           };
@@ -425,7 +432,7 @@ app.post("/send-message", async (req, res) => {
             caption: message,
           };
         }
-
+        await sock.sendMessage(exists.jid, options);
         // Hapus file setelah dikirim
         fs.unlink(uploadPath, (err) => {
           if (err) console.error("Error deleting file: ", err);
@@ -433,8 +440,6 @@ app.post("/send-message", async (req, res) => {
       } else {
         options = { text: message };
       }
-
-      await sock.sendMessage(exists.jid, options);
     }
 
     res.status(200).json({
