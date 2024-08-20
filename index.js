@@ -207,10 +207,10 @@ const connectToWhatsApp = async () => {
   const ownerNumber = "089654361768@s.whatsapp.net"; // Ganti dengan nomor pemilik WhatsApp
 
   // Buat objek untuk menyimpan status pengguna
-  const userStatus = {};
+  // const userStatus = {};
 
-  // Durasi waktu setelah pengguna memilih "tidak" (dalam milidetik)
-  const muteDuration = 60 * 60 * 1000; // 1 jam
+  // // Durasi waktu setelah pengguna memilih "tidak" (dalam milidetik)
+  // const muteDuration = 60 * 60 * 1000; // 1 jam
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
@@ -228,37 +228,8 @@ const connectToWhatsApp = async () => {
       console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
 
       try {
-        // Periksa apakah pengguna sebelumnya sudah memilih untuk tidak berbicara dengan AI
-        if (userStatus[phone] && userStatus[phone].muteUntil > Date.now()) {
-          console.log(
-            `Pengguna ${phone} telah memilih untuk tidak berbicara dengan AI.`
-          );
-          return;
-        }
-
-        // Jika ini adalah pesan pertama dari pengguna
-        if (!userStatus[phone]) {
-          // Tanyakan apakah pengguna ingin berbicara dengan AI
-          userStatus[phone] = { firstMessageSent: true };
-          const response =
-            "Apakah Anda ingin chat dengan AI? Balas dengan 'ya' untuk berbicara dengan AI atau 'tidak' jika tidak ingin direspons oleh AI.";
-          await sock.sendMessage(phone, { text: response });
-        } else if (!userStatus[phone].aiEnabled) {
-          // Periksa jawaban pengguna
-          if (pesan.toLowerCase() === "ya") {
-            userStatus[phone].aiEnabled = true;
-            const welcomeMessage = "Hallo, Apa yang ingin anda tanyakan?😊";
-            await sock.sendMessage(phone, { text: welcomeMessage });
-          } else if (pesan.toLowerCase() === "tidak") {
-            userStatus[phone].muteUntil = Date.now() + muteDuration;
-            const goodbyeMessage = "Oke , see you next time.";
-            await sock.sendMessage(phone, { text: goodbyeMessage });
-          }
-        } else {
-          // Jika pengguna telah memilih untuk berbicara dengan AI
-          const aiResponse = await run(pesan);
-          await sock.sendMessage(phone, { text: aiResponse });
-        }
+        const aiResponse = await run(pesan);
+        await sock.sendMessage(phone, { text: aiResponse });
       } catch (error) {
         console.error("Error processing message:", error);
         await sock.sendMessage(phone, {
