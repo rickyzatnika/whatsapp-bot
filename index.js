@@ -219,7 +219,7 @@ const connectToWhatsApp = async () => {
     // Periksa apakah pengirim pesan adalah pemilik WhatsApp
     if (phone === ownerNumber) {
       // Jika pengirim adalah pemilik, tidak ada tindakan yang dilakukan
-      console.log("Pesan dari pemilik, tidak direspons oleh AI.");
+      console.log("Pesan dari pemilik tidak direspons oleh AI.");
       return;
     }
 
