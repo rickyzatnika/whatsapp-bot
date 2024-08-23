@@ -197,7 +197,7 @@ const connectToWhatsApp = async () => {
       }
     } else if (connection === "open") {
       console.log("WhatsApp connected");
-      updateQR("connected");
+      updateQR("connect");
     }
   });
 
