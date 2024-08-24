@@ -203,33 +203,47 @@ const connectToWhatsApp = async () => {
 
   sock.ev.on("creds.update", saveCreds);
 
-  // Tentukan nomor pemilik WhatsApp
-  const ownerNumber = "089654361768@s.whatsapp.net"; // Ganti dengan nomor pemilik WhatsApp
-
   // Buat objek untuk menyimpan status pengguna
-  // const userStatus = {};
+  const userStatus = {};
+  // sock.ev.on("messages.upsert", async ({ messages }) => {
+  //   const msg = messages[0];
+  //   const phone = msg.key.remoteJid;
 
-  // // Durasi waktu setelah pengguna memilih "tidak" (dalam milidetik)
-  // const muteDuration = 60 * 60 * 1000; // 1 jam
+  //   if (msg.message.conversation) {
+  //     const pesan = msg.message.conversation;
+
+  //     try {
+  //       const aiResponse = await run(pesan);
+  //       await sock.sendMessage(phone, { text: aiResponse });
+  //     } catch (error) {
+  //       await sock.sendMessage(phone, {
+  //         text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
+  //       });
+  //     }
+  //   }
+  // });
 
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     const phone = msg.key.remoteJid;
-
-    // Periksa apakah pengirim pesan adalah pemilik WhatsApp
-    if (phone === ownerNumber) {
-      // Jika pengirim adalah pemilik, tidak ada tindakan yang dilakukan
-      console.log("Pesan dari pemilik tidak direspons oleh AI.");
-      return;
-    }
 
     if (msg.message.conversation) {
       const pesan = msg.message.conversation;
       console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
 
       try {
-        const aiResponse = await run(pesan);
-        await sock.sendMessage(phone, { text: aiResponse });
+        // Periksa status pengirim
+        if (!userStatus[phone]) {
+          // Pesan pertama
+          userStatus[phone] = { firstMessageSent: true };
+          const response =
+            "Hallo saya AI Ampas, saat ini Ricky masih tidur. Jika ingin menunggu saya bersedia menemani, silahkan tanyakan pertanyaan apapun atau apakah anda ingin saya membantu dengan sesuatu yang lain? Misalnya, apakah anda ingin saya:\n- Mencari informasi tentang topik tertentu?\n- Membuat naskah, novel, artikel atau cerpen\n- Membuat berbagai resep makanan\n- Memberi solusi tentang masalah yang sedang anda alami\n\nSilahkan beri tahu saya apa yang ingin Anda lakukan. Saya siap membantu!😊";
+          await sock.sendMessage(phone, { text: response });
+        } else {
+          // Pesan berikutnya
+          const aiResponse = await run(pesan);
+          await sock.sendMessage(phone, { text: aiResponse });
+        }
       } catch (error) {
         console.error("Error processing message:", error);
         await sock.sendMessage(phone, {
@@ -238,36 +252,6 @@ const connectToWhatsApp = async () => {
       }
     }
   });
-
-  // sock.ev.on("messages.upsert", async ({ messages }) => {
-  //   const msg = messages[0];
-  //   const phone = msg.key.remoteJid;
-
-  //   if (msg.message.conversation) {
-  //     const pesan = msg.message.conversation;
-  //     console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
-
-  //     try {
-  //       // Periksa status pengirim
-  //       if (!userStatus[phone]) {
-  //         // Pesan pertama
-  //         userStatus[phone] = { firstMessageSent: true };
-  //         const response =
-  //           "Hallo saya AI Ampas, saat ini Ricky masih tidur. Jika ingin menunggu saya bersedia menemani, silahkan tanyakan pertanyaan apapun atau apakah anda ingin saya membantu dengan sesuatu yang lain? Misalnya, apakah anda ingin saya:\n- Mencari informasi tentang topik tertentu?\n- Membuat naskah, novel, artikel atau cerpen\n- Membuat berbagai resep makanan\n- Memberi solusi tentang masalah yang sedang anda alami\n\nSilahkan beri tahu saya apa yang ingin Anda lakukan. Saya siap membantu!😊";
-  //         await sock.sendMessage(phone, { text: response });
-  //       } else {
-  //         // Pesan berikutnya
-  //         const aiResponse = await run(pesan);
-  //         await sock.sendMessage(phone, { text: aiResponse });
-  //       }
-  //     } catch (error) {
-  //       console.error("Error processing message:", error);
-  //       await sock.sendMessage(phone, {
-  //         text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
-  //       });
-  //     }
-  //   }
-  // });
 };
 
 // Socket.io Connection
