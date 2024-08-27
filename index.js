@@ -146,63 +146,6 @@ const connectToWhatsApp = async () => {
   });
   store.bind(sock.ev);
 
-  // sock.ev.on("connection.update", async (update) => {
-  //   const { connection, lastDisconnect, qr } = update;
-
-  //   if (qr) {
-  //     qrCode = qr;
-  //     updateQR("qr");
-  //   }
-
-  //   if (connection === "close") {
-  //     const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
-
-  //     switch (reason) {
-  //       case DisconnectReason.badSession:
-  //         console.log(`Bad Session File, Please Delete session and Scan Again`);
-  //         await sock.logout();
-  //         break;
-  //       case DisconnectReason.connectionClosed:
-  //         console.log("Connection closed, reconnecting....");
-  //         connectToWhatsApp();
-  //         break;
-  //       case DisconnectReason.connectionLost:
-  //         console.log("Connection Lost from Server, reconnecting...");
-  //         connectToWhatsApp();
-  //         break;
-  //       case DisconnectReason.connectionReplaced:
-  //         console.log(
-  //           "Connection Replaced, Another New Session Opened, Please Close Current Session First"
-  //         );
-  //         await sock.logout();
-  //         break;
-  //       case DisconnectReason.loggedOut:
-  //         console.log(
-  //           `Device Logged Out, Please Delete session and Scan Again.`
-  //         );
-  //         await sock.logout();
-  //         break;
-  //       case DisconnectReason.restartRequired:
-  //         console.log("Restart Required, Restarting...");
-  //         connectToWhatsApp();
-  //         break;
-  //       case DisconnectReason.timedOut:
-  //         console.log("Connection TimedOut, Reconnecting...");
-  //         connectToWhatsApp();
-  //         break;
-  //       default:
-  //         console.log(
-  //           `Unknown DisconnectReason: ${reason}|${lastDisconnect?.error}`
-  //         );
-  //         await sock.end();
-  //     }
-  //   } else if (connection === "open") {
-  //     console.log("WhatsApp connected");
-  //     updateQR("connect");
-  //   }
-  // });
-
-  // TEST
   sock.ev.on("connection.update", async (update) => {
     const { connection, lastDisconnect, qr } = update;
 
@@ -220,10 +163,12 @@ const connectToWhatsApp = async () => {
           await sock.logout();
           break;
         case DisconnectReason.connectionClosed:
-        case DisconnectReason.connectionLost:
-        case DisconnectReason.timedOut:
           console.log("Connection closed, reconnecting....");
-          reconnectTimer = setTimeout(connectToWhatsApp, 5000); // Wait 5 seconds
+          connectToWhatsApp();
+          break;
+        case DisconnectReason.connectionLost:
+          console.log("Connection Lost from Server, reconnecting...");
+          connectToWhatsApp();
           break;
         case DisconnectReason.connectionReplaced:
           console.log(
@@ -241,6 +186,10 @@ const connectToWhatsApp = async () => {
           console.log("Restart Required, Restarting...");
           connectToWhatsApp();
           break;
+        case DisconnectReason.timedOut:
+          console.log("Connection TimedOut, Reconnecting...");
+          connectToWhatsApp();
+          break;
         default:
           console.log(
             `Unknown DisconnectReason: ${reason}|${lastDisconnect?.error}`
@@ -250,7 +199,6 @@ const connectToWhatsApp = async () => {
     } else if (connection === "open") {
       console.log("WhatsApp connected");
       updateQR("connect");
-      clearTimeout(reconnectTimer); // Clear the timer if connection is successful
     }
   });
 
