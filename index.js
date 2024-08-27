@@ -45,6 +45,7 @@ const allowedOrigins = [
   "https://barland.vercel.app", // HTTPS
   "http://localhost:3000", // Localhost dengan HTTP
   "http://localhost:5000",
+  "https://smk-icb.vercel.app",
 ];
 
 app.use(
