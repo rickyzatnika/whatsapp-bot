@@ -154,7 +154,7 @@ const connectToWhatsApp = async () => {
       updateQR("qr");
     }
 
-    if (connection === "close") {
+    if (connection === "closed") {
       const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
 
       switch (reason) {
