@@ -151,7 +151,7 @@ const connectToWhatsApp = async () => {
     logger: P({ level: "silent" }),
     version,
     shouldIgnoreJid: (jid) => isJidBroadcast(jid),
-    browser: Browsers.macOS("Desktop"),
+    browser: "Desktop",
     syncFullHistory: true,
   });
   store.bind(sock.ev);
