@@ -20,6 +20,11 @@ import qrcode from "qrcode";
 import { fileURLToPath } from "url";
 
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import Messages from "./models/Message.js";
+import db from "./utils/db.js";
+import dotenv from "dotenv";
+
+dotenv.config();
 
 // Access your API key as an environment variable (see "Set up your API key" above)
 const genAI = new GoogleGenerativeAI(process.env.API_KEY);
@@ -28,7 +33,10 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 
 const app = express();
 const server = http.createServer(app);
-const io = new SocketIOServer(server); // Initialize Socket.IO server
+const io = new SocketIOServer(server, {
+  pingTimeout: 60000,
+  pingInterval: 25000,
+}); // Initialize Socket.IO server
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
@@ -44,7 +52,7 @@ app.use(
 const allowedOrigins = [
   "https://barland.vercel.app", // HTTPS
   "http://localhost:3000", // Localhost dengan HTTP
-  "http://localhost:5000",
+  "http://localhost:8000",
   "https://smk-icb.vercel.app",
 ];
 
@@ -143,6 +151,8 @@ const connectToWhatsApp = async () => {
     logger: P({ level: "silent" }),
     version,
     shouldIgnoreJid: (jid) => isJidBroadcast(jid),
+    browser: Browsers.macOS("Desktop"),
+    syncFullHistory: true,
   });
   store.bind(sock.ev);
 
@@ -202,47 +212,38 @@ const connectToWhatsApp = async () => {
 
   sock.ev.on("creds.update", saveCreds);
 
-  // Buat objek untuk menyimpan status pengguna
-  const userStatus = {};
-  // sock.ev.on("messages.upsert", async ({ messages }) => {
-  //   const msg = messages[0];
-  //   const phone = msg.key.remoteJid;
-
-  //   if (msg.message.conversation) {
-  //     const pesan = msg.message.conversation;
-
-  //     try {
-  //       const aiResponse = await run(pesan);
-  //       await sock.sendMessage(phone, { text: aiResponse });
-  //     } catch (error) {
-  //       await sock.sendMessage(phone, {
-  //         text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
-  //       });
-  //     }
-  //   }
-  // });
-
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     const phone = msg.key.remoteJid;
 
     if (msg.message.conversation) {
       const pesan = msg.message.conversation;
-      console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
 
       try {
-        // Periksa status pengirim
-        if (!userStatus[phone]) {
-          // Pesan pertama
-          userStatus[phone] = { firstMessageSent: true };
-          const response =
-            "Hallo saya AI Ampas, saat ini Ricky masih tidur. Jika ingin menunggu saya bersedia menemani, silahkan tanyakan pertanyaan apapun atau apakah anda ingin saya membantu dengan sesuatu yang lain? Misalnya, apakah anda ingin saya:\n- Mencari informasi tentang topik tertentu?\n- Membuat naskah, novel, artikel atau cerpen\n- Membuat berbagai resep makanan\n- Memberi solusi tentang masalah yang sedang anda alami\n\nSilahkan beri tahu saya apa yang ingin Anda lakukan. Saya siap membantu!😊";
-          await sock.sendMessage(phone, { text: response });
-        } else {
-          // Pesan berikutnya
-          const aiResponse = await run(pesan);
-          await sock.sendMessage(phone, { text: aiResponse });
-        }
+        // const contact = await sock.fetchContact(phone);
+        // const name = contact.notify || "Nama tidak tersedia";
+        // console.log(`Nama pengguna: ${name}`);
+
+        await db.connect();
+
+        // Simpan pesan ke MongoDB
+        await Messages.findOneAndUpdate(
+          { phone },
+          { $push: { messages: pesan } },
+          { upsert: true, new: true }
+        );
+
+        // Ambil riwayat pesan sebelumnya (5 pesan terakhir)
+        const history = await Messages.findOne({ phone });
+        const previousMessages = history
+          ? history.messages.slice(-5).join("\n")
+          : "";
+
+        const prompt = `${previousMessages}\n\nUser: ${pesan}\nAI:`;
+        const aiResponse = await run(prompt);
+
+        // Kirim pesan ke pengguna
+        await sock.sendMessage(phone, { text: aiResponse });
       } catch (error) {
         console.error("Error processing message:", error);
         await sock.sendMessage(phone, {
@@ -253,6 +254,37 @@ const connectToWhatsApp = async () => {
   });
 };
 
+//   sock.ev.on("messages.upsert", async ({ messages }) => {
+//     const msg = messages[0];
+//     const phone = msg.key.remoteJid;
+
+//     if (msg.message.conversation) {
+//       const pesan = msg.message.conversation;
+//       console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
+
+//       try {
+//         // Periksa status pengirim
+//         if (!userStatus[phone]) {
+//           // Pesan pertama
+//           userStatus[phone] = { firstMessageSent: true };
+//           const response =
+//             "Hallo saya AI Ampas, saat ini Ricky masih tidur. Jika ingin menunggu saya bersedia menemani, silahkan tanyakan pertanyaan apapun atau apakah anda ingin saya membantu dengan sesuatu yang lain? Misalnya, apakah anda ingin saya:\n- Mencari informasi tentang topik tertentu?\n- Membuat naskah, novel, artikel atau cerpen\n- Membuat berbagai resep makanan\n- Memberi solusi tentang masalah yang sedang anda alami\n\nSilahkan beri tahu saya apa yang ingin Anda lakukan. Saya siap membantu!😊";
+//           await sock.sendMessage(phone, { text: response });
+//         } else {
+//           // Pesan berikutnya
+//           const aiResponse = await run(pesan);
+//           await sock.sendMessage(phone, { text: aiResponse });
+//         }
+//       } catch (error) {
+//         console.error("Error processing message:", error);
+//         await sock.sendMessage(phone, {
+//           text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
+//         });
+//       }
+//     }
+//   });
+// };
+
 // Socket.io Connection
 io.on("connection", (socket) => {
   currentSocket = socket;
@@ -262,8 +294,8 @@ io.on("connection", (socket) => {
     updateQR("qr");
   }
 
-  socket.on("disconnect", () => {
-    console.log("User disconnected");
+  socket.on("disconnect", (reason) => {
+    console.log(`User disconnected due to: ${reason}`);
   });
 });
 
