@@ -187,9 +187,11 @@ const connectToWhatsApp = async () => {
           connectToWhatsApp();
           break;
         case DisconnectReason.timedOut:
+          console.log("Connection TimedOut, Reconnecting...");
           connectToWhatsApp();
           break;
         default:
+          console.log(`Unknown Disconnect: ${reason}|${lastDisconnect?.error}`);
           await sock.end();
       }
     } else if (connection === "open") {
