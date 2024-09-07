@@ -250,14 +250,16 @@ const connectToWhatsApp = async () => {
             const response = await axios.get(
               "https://smk-icb.vercel.app/api/daftar"
             );
-            const dataPendaftar = response.data; // Assuming data is returned as an array of student objects
+            const dataPendaftar = response.data?.murid?.sort((a, b) =>
+              a.name.localeCompare(b.name)
+            ); // Assuming data is returned as an array of student objects
 
             // Format the response message
             let formattedMessage = "Daftar calon siswa yang mendaftar:\n";
             dataPendaftar.forEach((siswa, index) => {
               formattedMessage += `${index + 1}. Nama: ${
-                siswa.nama
-              }, Jurusan: ${siswa.jurusan}\n`;
+                siswa?.name
+              }, Sekolah Asal: ${siswa?.school}\n`;
             });
 
             // Send the formatted message to the user
