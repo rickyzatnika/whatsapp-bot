@@ -23,6 +23,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import Messages from "./models/Message.js";
 import db from "./utils/db.js";
 import dotenv from "dotenv";
+import axios from "axios";
 
 dotenv.config();
 
@@ -239,11 +240,42 @@ const connectToWhatsApp = async () => {
           ? history.messages.slice(-5).join("\n")
           : "";
 
-        const prompt = `${previousMessages}\n\nUser: ${pesan}\nAI:`;
-        const aiResponse = await run(prompt);
+        // Cek apakah pesan meminta daftar calon siswa
+        if (
+          pesan.toLowerCase() === "pendaftar" ||
+          pesan.toLowerCase() === "data calon siswa"
+        ) {
+          try {
+            // Fetch data from the third-party API
+            const response = await axios.get(
+              "https://smk-icb.vercel.app/api/daftar"
+            );
+            const dataPendaftar = response.data; // Assuming data is returned as an array of student objects
 
-        // Kirim pesan ke pengguna
-        await sock.sendMessage(phone, { text: aiResponse });
+            // Format the response message
+            let formattedMessage = "Daftar calon siswa yang mendaftar:\n";
+            dataPendaftar.forEach((siswa, index) => {
+              formattedMessage += `${index + 1}. Nama: ${
+                siswa.nama
+              }, Jurusan: ${siswa.jurusan}\n`;
+            });
+
+            // Send the formatted message to the user
+            await sock.sendMessage(phone, { text: formattedMessage });
+          } catch (apiError) {
+            console.error("Error fetching daftar siswa:", apiError);
+            await sock.sendMessage(phone, {
+              text: "Maaf, saya tidak bisa mengambil data calon siswa saat ini.",
+            });
+          }
+        } else {
+          // Jika pesan tidak meminta daftar pendaftar, lanjutkan dengan AI response
+          const prompt = `${previousMessages}\n\nUser: ${pesan}\nAI:`;
+          const aiResponse = await run(prompt);
+
+          // Kirim AI response ke pengguna
+          await sock.sendMessage(phone, { text: aiResponse });
+        }
       } catch (error) {
         console.error("Error processing message:", error);
         await sock.sendMessage(phone, {
