@@ -23,7 +23,6 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 import Messages from "./models/Message.js";
 import db from "./utils/db.js";
 import dotenv from "dotenv";
-import axios from "axios";
 
 dotenv.config();
 
@@ -138,10 +137,8 @@ const connectToWhatsApp = async () => {
   // Path folder session
   const sessionFolderPath = path.join(__dirname, "baileys_auth_info");
 
-  // Only delete the folder if there’s a reason to reset the session
-  if (!fs.existsSync(sessionFolderPath)) {
-    deleteSessionFolder(sessionFolderPath);
-  }
+  // Hapus folder sesi sebelum memulai koneksi baru
+  deleteSessionFolder(sessionFolderPath);
 
   const { state, saveCreds } = await useMultiFileAuthState(sessionFolderPath);
   const { version } = await fetchLatestBaileysVersion();
@@ -171,6 +168,7 @@ const connectToWhatsApp = async () => {
       switch (reason) {
         case DisconnectReason.badSession:
           console.log(`Bad Session File, Please Delete session and Scan Again`);
+          deleteSessionFolder(sessionFolderPath); // Hapus folder sesi jika sesi rusak
           await sock.logout();
           break;
         case DisconnectReason.connectionClosed:
@@ -191,6 +189,7 @@ const connectToWhatsApp = async () => {
           console.log(
             `Device Logged Out, Please Delete session and Scan Again.`
           );
+          deleteSessionFolder(sessionFolderPath); // Hapus folder sesi saat logout
           await sock.logout();
           break;
         case DisconnectReason.restartRequired:
@@ -240,44 +239,11 @@ const connectToWhatsApp = async () => {
           ? history.messages.slice(-5).join("\n")
           : "";
 
-        // Cek apakah pesan meminta daftar calon siswa
-        if (
-          pesan.toLowerCase() === "pendaftar" ||
-          pesan.toLowerCase() === "data calon siswa"
-        ) {
-          try {
-            // Fetch data from the third-party API
-            const response = await axios.get(
-              "https://smk-icb.vercel.app/api/daftar"
-            );
-            const dataPendaftar = response.data?.murid?.sort((a, b) =>
-              a.name.localeCompare(b.name)
-            ); // Assuming data is returned as an array of student objects
+        const prompt = `${previousMessages}\n\nUser: ${pesan}\nAI:`;
+        const aiResponse = await run(prompt);
 
-            // Format the response message
-            let formattedMessage = "Daftar calon siswa yang mendaftar:\n";
-            dataPendaftar.forEach((siswa, index) => {
-              formattedMessage += `${index + 1}. Nama: ${
-                siswa?.name
-              }, Sekolah Asal: ${siswa?.school}\n`;
-            });
-
-            // Send the formatted message to the user
-            await sock.sendMessage(phone, { text: formattedMessage });
-          } catch (apiError) {
-            console.error("Error fetching daftar siswa:", apiError);
-            await sock.sendMessage(phone, {
-              text: "Maaf, saya tidak bisa mengambil data calon siswa saat ini.",
-            });
-          }
-        } else {
-          // Jika pesan tidak meminta daftar pendaftar, lanjutkan dengan AI response
-          const prompt = `${previousMessages}\n\nUser: ${pesan}\nAI:`;
-          const aiResponse = await run(prompt);
-
-          // Kirim AI response ke pengguna
-          await sock.sendMessage(phone, { text: aiResponse });
-        }
+        // Kirim pesan ke pengguna
+        await sock.sendMessage(phone, { text: aiResponse });
       } catch (error) {
         console.error("Error processing message:", error);
         await sock.sendMessage(phone, {
