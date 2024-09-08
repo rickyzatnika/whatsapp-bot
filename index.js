@@ -203,7 +203,7 @@ const connectToWhatsApp = async () => {
           connectToWhatsApp();
           break;
         default:
-          console.log(`Unknown Disconnect: ${reason}|${lastDisconnect?.error}`);
+          console.log(`Unknown Disconnect`);
           await sock.end();
       }
     } else if (connection === "open") {
