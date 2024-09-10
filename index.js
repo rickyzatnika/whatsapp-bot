@@ -257,11 +257,11 @@ const connectToWhatsApp = async () => {
 
             if (isFirstMessage) {
               // Jika pesan pertama, perkenalan AI
-              prompt = `Kamu adalah AI asisten untuk ${myData.nama}. Saya siap menjawab pertanyaan tentang Ricky. Ini data saya: ${JSON.stringify(myData)}\nPengguna bertanya: ${pesan}\nAI:`;
+              prompt = `Kamu adalah AI asisten. Pengguna bertanya: ${pesan}\nAI:`; // Menghilangkan konteks tentang Ricky
               isFirstMessage = false; // Setel ke false setelah pesan pertama
           } else {
               // Untuk pesan berikutnya
-              prompt = `Kamu adalah AI asisten untuk ${myData.nama}. Ini tentang saya: ${JSON.stringify(myData)}\nPengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\nJika kamu tidak memiliki informasi yang cukup tentang Ricky, berikan pertanyaan untuk meminta klarifikasi. Pengguna: ${pesan}\nAI:`;
+              prompt = `Pengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\nJika kamu tidak memiliki informasi yang cukup, berikan pertanyaan untuk meminta klarifikasi. Pengguna: ${pesan}\nAI:`; // Menghilangkan konteks tentang Ricky
           }
 
             const aiResponse = await run(prompt);
