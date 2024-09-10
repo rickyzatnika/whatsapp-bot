@@ -1,6 +1,6 @@
 import mongoose from "mongoose";
 
-const connect = async () => {
+const db = async () => {
   try {
     mongoose.set("strictQuery", false);
     await mongoose.connect(process.env.MONGODB_URI, {
@@ -12,4 +12,4 @@ const connect = async () => {
   }
 };
 
-export default connect;
+export default db;

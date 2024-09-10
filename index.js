@@ -39,6 +39,7 @@ const io = new SocketIOServer(server, {
 }); // Initialize Socket.IO server
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
+const jsonFilePath = path.join(__dirname, "about.json");
 
 app.use("/assets", express.static(path.join(__dirname, "client", "assets")));
 
@@ -121,6 +122,18 @@ async function run(prompt) {
     return "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini."; // Fallback message
   }
 }
+
+
+// Fungsi untuk memuat data sekolah dari JSON
+const loadData = () => {
+  try {
+    const data = fs.readFileSync(jsonFilePath);
+    return JSON.parse(data);
+  } catch (error) {
+    console.error("Error loading school data:", error);
+    return {};
+  }
+};
 
 // Fungsi untuk menghapus folder session secara otomatis
 const deleteSessionFolder = (folderPath) => {
@@ -214,78 +227,57 @@ const connectToWhatsApp = async () => {
 
   sock.ev.on("creds.update", saveCreds);
 
+  let isFirstMessage = true; // Variabel untuk melacak pesan pertama
+
   sock.ev.on("messages.upsert", async ({ messages }) => {
     const msg = messages[0];
     const phone = msg.key.remoteJid;
 
     if (msg.message.conversation) {
-      const pesan = msg.message.conversation;
+        const pesan = msg.message.conversation;
 
-      try {
-        // const contact = await sock.fetchContact(phone);
-        // const name = contact.notify || "Nama tidak tersedia";
-        // console.log(`Nama pengguna: ${name}`);
+        try {
+            await db.connect();
 
-        await db.connect();
+            // Simpan pesan ke MongoDB
+            await Messages.findOneAndUpdate(
+                { phone },
+                { $push: { messages: pesan } },
+                { upsert: true, new: true }
+            );
 
-        // Simpan pesan ke MongoDB
-        await Messages.findOneAndUpdate(
-          { phone },
-          { $push: { messages: pesan } },
-          { upsert: true, new: true }
-        );
+            // Ambil riwayat pesan sebelumnya (5 pesan terakhir)
+            const history = await Messages.findOne({ phone });
+            const previousMessages = history
+                ? history.messages.slice(-5).filter(msg => msg !== pesan).join("\n") // Filter pesan yang sama
+                : "";
 
-        // Ambil riwayat pesan sebelumnya (5 pesan terakhir)
-        const history = await Messages.findOne({ phone });
-        const previousMessages = history
-          ? history.messages.slice(-5).join("\n")
-          : "";
+            const myData = loadData();
+            let prompt;
 
-        const prompt = `${previousMessages}\n\nUser: ${pesan}\nAI:`;
-        const aiResponse = await run(prompt);
+            if (isFirstMessage) {
+              // Jika pesan pertama, perkenalan AI
+              prompt = `Kamu adalah AI asisten untuk ${myData.nama}. Saya siap menjawab pertanyaan tentang Ricky. Ini data saya: ${JSON.stringify(myData)}\nPengguna bertanya: ${pesan}\nAI:`;
+              isFirstMessage = false; // Setel ke false setelah pesan pertama
+          } else {
+              // Untuk pesan berikutnya
+              prompt = `Kamu adalah AI asisten untuk ${myData.nama}. Ini tentang saya: ${JSON.stringify(myData)}\nPengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\nJika kamu tidak memiliki informasi yang cukup tentang Ricky, berikan pertanyaan untuk meminta klarifikasi. Pengguna: ${pesan}\nAI:`;
+          }
 
-        // Kirim pesan ke pengguna
-        await sock.sendMessage(phone, { text: aiResponse });
-      } catch (error) {
-        console.error("Error processing message:", error);
-        await sock.sendMessage(phone, {
-          text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
-        });
-      }
+            const aiResponse = await run(prompt);
+
+            // Kirim pesan ke pengguna
+            await sock.sendMessage(phone, { text: aiResponse });
+        } catch (error) {
+            console.error("Error processing message:", error);
+            await sock.sendMessage(phone, {
+                text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
+            });
+        }
     }
-  });
+});
 };
 
-//   sock.ev.on("messages.upsert", async ({ messages }) => {
-//     const msg = messages[0];
-//     const phone = msg.key.remoteJid;
-
-//     if (msg.message.conversation) {
-//       const pesan = msg.message.conversation;
-//       console.log(`Pesan masuk: ${pesan} - Dari: ${phone}`);
-
-//       try {
-//         // Periksa status pengirim
-//         if (!userStatus[phone]) {
-//           // Pesan pertama
-//           userStatus[phone] = { firstMessageSent: true };
-//           const response =
-//             "Hallo saya AI Ampas, saat ini Ricky masih tidur. Jika ingin menunggu saya bersedia menemani, silahkan tanyakan pertanyaan apapun atau apakah anda ingin saya membantu dengan sesuatu yang lain? Misalnya, apakah anda ingin saya:\n- Mencari informasi tentang topik tertentu?\n- Membuat naskah, novel, artikel atau cerpen\n- Membuat berbagai resep makanan\n- Memberi solusi tentang masalah yang sedang anda alami\n\nSilahkan beri tahu saya apa yang ingin Anda lakukan. Saya siap membantu!😊";
-//           await sock.sendMessage(phone, { text: response });
-//         } else {
-//           // Pesan berikutnya
-//           const aiResponse = await run(pesan);
-//           await sock.sendMessage(phone, { text: aiResponse });
-//         }
-//       } catch (error) {
-//         console.error("Error processing message:", error);
-//         await sock.sendMessage(phone, {
-//           text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
-//         });
-//       }
-//     }
-//   });
-// };
 
 // Socket.io Connection
 io.on("connection", (socket) => {
