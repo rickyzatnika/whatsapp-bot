@@ -81,13 +81,13 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "client", "index.html"));
 });
 
-// Utility Functions
-const capitalize = (text) => {
-  return text
-    .split(" ")
-    .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-    .join(" ");
-};
+// // Utility Functions
+// const capitalize = (text) => {
+//   return text
+//     .split(" ")
+//     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
+//     .join(" ");
+// };
 
 // Baileys Store
 const store = makeInMemoryStore({
@@ -256,7 +256,7 @@ const connectToWhatsApp = async () => {
 
         // const myData = loadData();
         let prompt;
-        prompt = `Nama kamu adalah AI, panggil semua pesan yang masuk dengan nama Bos. Pengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\nJika kamu tidak memiliki informasi yang cukup, berikan pertanyaan untuk meminta klarifikasi. Pengguna: ${pesan}\nAI:`; // Menghilangkan konteks tentang Ricky
+        prompt = `Nama kamu adalah Hulenx AI.. Pengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\nJika kamu tidak memiliki informasi yang cukup, berikan pertanyaan untuk meminta klarifikasi. Pengguna: ${pesan}\nAI:`; // Menghilangkan konteks tentang Ricky
 
         const aiResponse = await run(prompt);
 
