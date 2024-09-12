@@ -81,14 +81,6 @@ app.get("/", (req, res) => {
   res.sendFile(path.join(__dirname, "client", "index.html"));
 });
 
-// // Utility Functions
-// const capitalize = (text) => {
-//   return text
-//     .split(" ")
-//     .map((word) => word.charAt(0).toUpperCase() + word.slice(1))
-//     .join(" ");
-// };
-
 // Baileys Store
 const store = makeInMemoryStore({
   logger: P().child({ level: "silent", stream: "store" }),
