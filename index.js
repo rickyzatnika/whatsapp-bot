@@ -115,17 +115,6 @@ async function run(prompt) {
   }
 }
 
-// Fungsi untuk memuat data sekolah dari JSON
-// const loadData = () => {
-//   try {
-//     const data = fs.readFileSync(jsonFilePath);
-//     return JSON.parse(data);
-//   } catch (error) {
-//     console.error("Error loading school data:", error);
-//     return {};
-//   }
-// };
-
 // Fungsi untuk menghapus folder session secara otomatis
 const deleteSessionFolder = (folderPath) => {
   if (fs.existsSync(folderPath)) {
