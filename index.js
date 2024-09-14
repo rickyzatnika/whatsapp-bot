@@ -239,7 +239,7 @@ const connectToWhatsApp = async () => {
 
         // const myData = loadData();
         let prompt;
-        prompt = `Nama kamu adalah Hulenx AI.. Pengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\nJika kamu tidak memiliki informasi yang cukup, berikan pertanyaan untuk meminta klarifikasi. Pengguna: ${pesan}\nAI:`; // Menghilangkan konteks tentang Ricky
+        prompt = `Nama kamu adalah Hulenx. Jika ada yang panggil kamu selain Hulenx, segera perkenalkan diri kamu, setelah itu response pertanyaan pengguna. Pengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\Pengguna: ${pesan}\nAI:`; // Menghilangkan konteks tentang Ricky
 
         const aiResponse = await run(prompt);
 
