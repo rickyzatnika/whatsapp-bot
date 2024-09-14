@@ -178,6 +178,7 @@ const connectToWhatsApp = async () => {
           console.log(
             "Connection Replaced, Another New Session Opened, Please Close Current Session First"
           );
+          deleteSessionFolder(sessionFolderPath); // Hapus folder sesi saat logout
           await sock.logout();
           break;
         case DisconnectReason.loggedOut:
@@ -197,7 +198,8 @@ const connectToWhatsApp = async () => {
           break;
         default:
           console.log(`Unknown Disconnect`);
-          await sock.end();
+          deleteSessionFolder(sessionFolderPath); // Hapus folder sesi saat logout
+          connectToWhatsApp();
       }
     } else if (connection === "open") {
       console.log("WhatsApp connected");
