@@ -243,7 +243,7 @@ const connectToWhatsApp = async () => {
 
                 // const myData = loadData();
                 let prompt;
-                prompt = `Kamu adalah Hulenx., teman dari orang bernama Ricky, leng dan ki. Pengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\Pengguna: ${pesan}\nAI:  situs web kamu : https://hulenx-ai.vercel.app"`; // Menghilangkan konteks tentang Ricky
+                prompt = `Kamu adalah Hulenx.. Pengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\Pengguna: ${pesan}\nAI:  situs web kamu : https://hulenx-ai.vercel.app"`; // Menghilangkan konteks tentang Ricky
 
                 const aiResponse = await run(prompt);
 
