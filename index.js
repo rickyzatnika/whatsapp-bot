@@ -1,9 +1,9 @@
 import {
-  DisconnectReason,
-  fetchLatestBaileysVersion,
-  isJidBroadcast,
-  makeInMemoryStore,
-  useMultiFileAuthState,
+    DisconnectReason,
+    fetchLatestBaileysVersion,
+    isJidBroadcast,
+    makeInMemoryStore,
+    useMultiFileAuthState,
 } from "@whiskeysockets/baileys";
 import { makeWASocket } from "@whiskeysockets/baileys"; // Fixed import
 import P from "pino";
@@ -34,8 +34,8 @@ const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" });
 const app = express();
 const server = http.createServer(app);
 const io = new SocketIOServer(server, {
-  pingTimeout: 60000,
-  pingInterval: 25000,
+    pingTimeout: 60000,
+    pingInterval: 25000,
 }); // Initialize Socket.IO server
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -45,45 +45,45 @@ app.use("/assets", express.static(path.join(__dirname, "client", "assets")));
 
 // Middleware Configuration
 app.use(
-  fileUpload({
-    createParentPath: true,
-  })
+    fileUpload({
+        createParentPath: true,
+    })
 );
 // Daftar domain yang diizinkan
 const allowedOrigins = [
-  "https://barland.vercel.app", // HTTPS
-  "http://localhost:3000", // Localhost dengan HTTP
-  "http://localhost:8000",
-  "https://smk-icb.vercel.app",
+    "https://barland.vercel.app", // HTTPS
+    "http://localhost:3000", // Localhost dengan HTTP
+    "http://localhost:8000",
+    "https://smk-icb.vercel.app",
 ];
 
 app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
-        // Jika origin ada dalam daftar yang diizinkan atau tidak ada origin (misalnya untuk permintaan dari server ke server)
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
-    },
-  })
+    cors({
+        origin: (origin, callback) => {
+            if (allowedOrigins.indexOf(origin) !== -1 || !origin) {
+                // Jika origin ada dalam daftar yang diizinkan atau tidak ada origin (misalnya untuk permintaan dari server ke server)
+                callback(null, true);
+            } else {
+                callback(new Error("Not allowed by CORS"));
+            }
+        },
+    })
 );
 app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 
 // Routes
 app.get("/scan", (req, res) => {
-  res.sendFile(path.join(__dirname, "client", "server.html"));
+    res.sendFile(path.join(__dirname, "client", "server.html"));
 });
 
 app.get("/", (req, res) => {
-  res.sendFile(path.join(__dirname, "client", "index.html"));
+    res.sendFile(path.join(__dirname, "client", "index.html"));
 });
 
 // Baileys Store
 const store = makeInMemoryStore({
-  logger: P().child({ level: "silent", stream: "store" }),
+    logger: P().child({ level: "silent", stream: "store" }),
 });
 
 let sock;
@@ -91,328 +91,337 @@ let qrCode;
 let currentSocket;
 
 async function run(prompt) {
-  try {
-    console.log("Sending request to AI with prompt:", prompt);
-    const result = await model.generateContent(prompt);
-    console.log("Received response from AI:", result);
+    try {
+        console.log("Sending request to AI with prompt:", prompt);
+        const result = await model.generateContent(prompt);
+        console.log("Received response from AI:", result);
 
-    // Pastikan untuk memeriksa struktur respons
-    if (
-      result &&
-      result.response &&
-      typeof result.response.text === "function"
-    ) {
-      // Panggil fungsi `text` untuk mendapatkan hasilnya
-      const text = await result.response.text();
-      console.log("Extracted text from AI response:", text);
-      return text;
-    } else {
-      throw new Error("AI response text function not found or not callable");
+        // Pastikan untuk memeriksa struktur respons
+        if (
+            result &&
+            result.response &&
+            typeof result.response.text === "function"
+        ) {
+            // Panggil fungsi `text` untuk mendapatkan hasilnya
+            const text = await result.response.text();
+            console.log("Extracted text from AI response:", text);
+            return text;
+        } else {
+            throw new Error(
+                "AI response text function not found or not callable"
+            );
+        }
+    } catch (error) {
+        console.error("Error during AI interaction:", error);
+        return "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini."; // Fallback message
     }
-  } catch (error) {
-    console.error("Error during AI interaction:", error);
-    return "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini."; // Fallback message
-  }
 }
 
 // Fungsi untuk menghapus folder session secara otomatis
 const deleteSessionFolder = (folderPath) => {
-  if (fs.existsSync(folderPath)) {
-    fs.rmSync(folderPath, { recursive: true, force: true });
-    console.log(`Folder ${folderPath} berhasil dihapus.`);
-  } else {
-    console.log(`Folder ${folderPath} tidak ditemukan.`);
-  }
+    if (fs.existsSync(folderPath)) {
+        fs.rmSync(folderPath, { recursive: true, force: true });
+        console.log(`Folder ${folderPath} berhasil dihapus.`);
+    } else {
+        console.log(`Folder ${folderPath} tidak ditemukan.`);
+    }
 };
 
 // WhatsApp Connection Function
 const connectToWhatsApp = async () => {
-  // Path folder session
-  const sessionFolderPath = path.join(__dirname, "baileys_auth_info");
+    // Path folder session
+    const sessionFolderPath = path.join(__dirname, "baileys_auth_info");
 
-  // Only delete the folder if there’s a reason to reset the session
-  if (!fs.existsSync(sessionFolderPath)) {
-    deleteSessionFolder(sessionFolderPath);
-  }
-
-  const { state, saveCreds } = await useMultiFileAuthState(sessionFolderPath);
-  const { version } = await fetchLatestBaileysVersion();
-
-  sock = makeWASocket({
-    auth: state,
-    printQRInTerminal: true,
-    logger: P({ level: "silent" }),
-    version,
-    shouldIgnoreJid: (jid) => isJidBroadcast(jid),
-    browser: "Desktop",
-    syncFullHistory: true,
-  });
-  store.bind(sock.ev);
-
-  sock.ev.on("connection.update", async (update) => {
-    const { connection, lastDisconnect, qr } = update;
-
-    if (qr) {
-      qrCode = qr;
-      updateQR("qr");
+    // Only delete the folder if there’s a reason to reset the session
+    if (!fs.existsSync(sessionFolderPath)) {
+        deleteSessionFolder(sessionFolderPath);
     }
 
-    if (connection === "close") {
-      const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
+    const { state, saveCreds } = await useMultiFileAuthState(sessionFolderPath);
+    const { version } = await fetchLatestBaileysVersion();
 
-      switch (reason) {
-        case DisconnectReason.badSession:
-          console.log(`Bad Session File, Please Delete session and Scan Again`);
-          deleteSessionFolder(sessionFolderPath); // Hapus folder sesi jika sesi rusak
-          await sock.logout();
-          break;
-        case DisconnectReason.connectionClosed:
-          console.log("Connection closed, reconnecting....");
-          connectToWhatsApp();
-          break;
-        case DisconnectReason.connectionLost:
-          console.log("Connection Lost from Server, reconnecting...");
-          connectToWhatsApp();
-          break;
-        case DisconnectReason.connectionReplaced:
-          console.log(
-            "Connection Replaced, Another New Session Opened, Please Close Current Session First"
-          );
-          deleteSessionFolder(sessionFolderPath); // Hapus folder sesi saat logout
-          await sock.logout();
-          break;
-        case DisconnectReason.loggedOut:
-          console.log(
-            `Device Logged Out, Please Delete session and Scan Again.`
-          );
-          deleteSessionFolder(sessionFolderPath); // Hapus folder sesi saat logout
-          await sock.logout();
-          break;
-        case DisconnectReason.restartRequired:
-          console.log("Restart Required, Restarting...");
-          connectToWhatsApp();
-          break;
-        case DisconnectReason.timedOut:
-          console.log("Connection TimedOut, Reconnecting...");
-          connectToWhatsApp();
-          break;
-        default:
-          console.log(`Unknown Disconnect`);
-          deleteSessionFolder(sessionFolderPath); // Hapus folder sesi saat logout
-          connectToWhatsApp();
-      }
-    } else if (connection === "open") {
-      console.log("WhatsApp connected");
-      updateQR("connect");
-    }
-  });
+    sock = makeWASocket({
+        auth: state,
+        printQRInTerminal: true,
+        logger: P({ level: "silent" }),
+        version,
+        shouldIgnoreJid: (jid) => isJidBroadcast(jid),
+        browser: "Desktop",
+        syncFullHistory: true,
+    });
+    store.bind(sock.ev);
 
-  sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("connection.update", async (update) => {
+        const { connection, lastDisconnect, qr } = update;
 
-  let isFirstMessage = true; // Variabel untuk melacak pesan pertama
+        if (qr) {
+            qrCode = qr;
+            updateQR("qr");
+        }
 
-  sock.ev.on("messages.upsert", async ({ messages }) => {
-    const msg = messages[0];
-    const phone = msg.key.remoteJid;
+        if (connection === "close") {
+            const reason = new Boom(lastDisconnect?.error)?.output?.statusCode;
 
-    if (msg.message.conversation) {
-      const pesan = msg.message.conversation;
+            switch (reason) {
+                case DisconnectReason.badSession:
+                    console.log(
+                        `Bad Session File, Please Delete session and Scan Again`
+                    );
+                    deleteSessionFolder(sessionFolderPath); // Hapus folder sesi jika sesi rusak
+                    await sock.logout();
+                    break;
+                case DisconnectReason.connectionClosed:
+                    console.log("Connection closed, reconnecting....");
+                    connectToWhatsApp();
+                    break;
+                case DisconnectReason.connectionLost:
+                    console.log("Connection Lost from Server, reconnecting...");
+                    connectToWhatsApp();
+                    break;
+                case DisconnectReason.connectionReplaced:
+                    console.log(
+                        "Connection Replaced, Another New Session Opened, Please Close Current Session First"
+                    );
+                    deleteSessionFolder(sessionFolderPath); // Hapus folder sesi saat logout
+                    await sock.logout();
+                    break;
+                case DisconnectReason.loggedOut:
+                    console.log(
+                        `Device Logged Out, Please Delete session and Scan Again.`
+                    );
+                    deleteSessionFolder(sessionFolderPath); // Hapus folder sesi saat logout
+                    await sock.logout();
+                    break;
+                case DisconnectReason.restartRequired:
+                    console.log("Restart Required, Restarting...");
+                    connectToWhatsApp();
+                    break;
+                case DisconnectReason.timedOut:
+                    console.log("Connection TimedOut, Reconnecting...");
+                    connectToWhatsApp();
+                    break;
+                default:
+                    console.log(`Unknown Disconnect`);
+                    deleteSessionFolder(sessionFolderPath); // Hapus folder sesi saat logout
+                    connectToWhatsApp();
+            }
+        } else if (connection === "open") {
+            console.log("WhatsApp connected");
+            updateQR("connect");
+        }
+    });
 
-      try {
-        await db.connect();
+    sock.ev.on("creds.update", saveCreds);
 
-        // Simpan pesan ke MongoDB
-        await Messages.findOneAndUpdate(
-          { phone },
-          { $push: { messages: pesan } },
-          { upsert: true, new: true }
-        );
+    let isFirstMessage = true; // Variabel untuk melacak pesan pertama
 
-        // Ambil riwayat pesan sebelumnya (5 pesan terakhir)
-        const history = await Messages.findOne({ phone });
-        const previousMessages = history
-          ? history.messages
-              .slice(-5)
-              .filter((msg) => msg !== pesan)
-              .join("\n") // Filter pesan yang sama
-          : "";
+    sock.ev.on("messages.upsert", async ({ messages }) => {
+        const msg = messages[0];
+        const phone = msg.key.remoteJid;
 
-        // const myData = loadData();
-        let prompt;
-        prompt = `Perkenalkan kepada pengguna bahwa Nama kamu adalah Hulenx AI, cukup sekali saja. Setelah itu response pertanyaan pengguna. Pengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\Pengguna: ${pesan}\nAI: jika tidak ada pertanyaan lagi, jangan lupa berikan response "Terima kasih, silahkan bertanya lagi jika ada pertanyaan, atau bisa kunjungi website Hulenx AI di https://hulenx-ai.vercel.app"`; // Menghilangkan konteks tentang Ricky
+        if (msg.message.conversation) {
+            const pesan = msg.message.conversation;
 
-        const aiResponse = await run(prompt);
+            try {
+                await db.connect();
 
-        await sock.sendMessage(phone, { text: aiResponse });
-      } catch (error) {
-        console.error("Error processing message:", error);
-        await sock.sendMessage(phone, {
-          text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
-        });
-      }
-    }
-  });
+                // Simpan pesan ke MongoDB
+                await Messages.findOneAndUpdate(
+                    { phone },
+                    { $push: { messages: pesan } },
+                    { upsert: true, new: true }
+                );
+
+                // Ambil riwayat pesan sebelumnya (5 pesan terakhir)
+                const history = await Messages.findOne({ phone });
+                const previousMessages = history
+                    ? history.messages
+                          .slice(-5)
+                          .filter((msg) => msg !== pesan)
+                          .join("\n") // Filter pesan yang sama
+                    : "";
+
+                // const myData = loadData();
+                let prompt;
+                prompt = `Kamu adalah Hulenx., teman dari orang bernama Ricky, leng dan ki. Pengguna bertanya: ${pesan}\nRiwayat pesan sebelumnya:\n${previousMessages}\n\Pengguna: ${pesan}\nAI:  situs web kamu : https://hulenx-ai.vercel.app"`; // Menghilangkan konteks tentang Ricky
+
+                const aiResponse = await run(prompt);
+
+                await sock.sendMessage(phone, { text: aiResponse });
+            } catch (error) {
+                console.error("Error processing message:", error);
+                await sock.sendMessage(phone, {
+                    text: "Maaf, saya tidak dapat menjawab pertanyaan Anda saat ini.",
+                });
+            }
+        }
+    });
 };
 
 // Socket.io Connection
 io.on("connection", (socket) => {
-  currentSocket = socket;
-  if (isConnected()) {
-    updateQR("connected");
-  } else if (qrCode) {
-    updateQR("qr");
-  }
+    currentSocket = socket;
+    if (isConnected()) {
+        updateQR("connected");
+    } else if (qrCode) {
+        updateQR("qr");
+    }
 
-  socket.on("disconnect", (reason) => {
-    console.log(`User disconnected due to: ${reason}`);
-  });
+    socket.on("disconnect", (reason) => {
+        console.log(`User disconnected due to: ${reason}`);
+    });
 });
 
 // Helper Functions
 const isConnected = () => {
-  return !!sock?.user;
+    return !!sock?.user;
 };
 
 const updateQR = (status) => {
-  if (!currentSocket) {
-    return;
-  }
+    if (!currentSocket) {
+        return;
+    }
 
-  switch (status) {
-    case "qr":
-      qrcode.toDataURL(qrCode, (err, url) => {
-        if (err) {
-          console.error("Error generating QR Code: ", err);
-        } else {
-          currentSocket?.emit("qr", url);
-          currentSocket?.emit("log", "QR Code received, please scan!");
-        }
-      });
-      break;
-    case "connected":
-      currentSocket?.emit("qrstatus", "./assets/check.svg");
-      currentSocket?.emit("log", "WhatsApp terhubung!");
-      break;
-    case "qrscanned":
-      currentSocket?.emit("qrstatus", "./assets/check.svg");
-      currentSocket?.emit("log", "QR Code Telah discan!");
-      break;
-    case "loading":
-      currentSocket?.emit("qrstatus", "./assets/loader.gif");
-      currentSocket?.emit("log", "Registering QR Code, please wait!");
-      break;
-    default:
-      break;
-  }
+    switch (status) {
+        case "qr":
+            qrcode.toDataURL(qrCode, (err, url) => {
+                if (err) {
+                    console.error("Error generating QR Code: ", err);
+                } else {
+                    currentSocket?.emit("qr", url);
+                    currentSocket?.emit(
+                        "log",
+                        "QR Code received, please scan!"
+                    );
+                }
+            });
+            break;
+        case "connected":
+            currentSocket?.emit("qrstatus", "./assets/check.svg");
+            currentSocket?.emit("log", "WhatsApp terhubung!");
+            break;
+        case "qrscanned":
+            currentSocket?.emit("qrstatus", "./assets/check.svg");
+            currentSocket?.emit("log", "QR Code Telah discan!");
+            break;
+        case "loading":
+            currentSocket?.emit("qrstatus", "./assets/loader.gif");
+            currentSocket?.emit("log", "Registering QR Code, please wait!");
+            break;
+        default:
+            break;
+    }
 };
 
 // Send Text Message to WhatsApp User
 app.post("/send-message", async (req, res) => {
-  let { numbers, message } = req.body;
-  const file = req.files?.file_dikirim;
+    let { numbers, message } = req.body;
+    const file = req.files?.file_dikirim;
 
-  // Parsing numbers jika masih berupa string
-  if (typeof numbers === "string") {
-    try {
-      numbers = JSON.parse(numbers);
-    } catch (error) {
-      return res.status(400).json({
-        status: false,
-        response: "Format daftar nomor WA tidak valid!",
-      });
-    }
-  }
-
-  if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
-    return res.status(400).json({
-      status: false,
-      response: "Daftar nomor WA tidak disertakan!",
-    });
-  }
-
-  try {
-    if (!isConnected()) {
-      return res.status(500).json({
-        status: false,
-        response: "WhatsApp belum terhubung.",
-      });
+    // Parsing numbers jika masih berupa string
+    if (typeof numbers === "string") {
+        try {
+            numbers = JSON.parse(numbers);
+        } catch (error) {
+            return res.status(400).json({
+                status: false,
+                response: "Format daftar nomor WA tidak valid!",
+            });
+        }
     }
 
-    for (const number of numbers) {
-      const numberWA = `${number}@s.whatsapp.net`;
-      const [exists] = await sock.onWhatsApp(numberWA);
-
-      if (!exists?.jid) {
-        console.warn(`Nomor ${number} tidak terdaftar.`);
-        continue;
-      }
-
-      let options = {};
-
-      if (file) {
-        const uploadPath = path.join(
-          __dirname,
-          "uploads",
-          `${Date.now()}_${file.name}`
-        );
-
-        // Handle File Upload
-
-        // Cek apakah direktori 'uploads' ada
-        if (!fs.existsSync(path.join(__dirname, "uploads"))) {
-          fs.mkdirSync(path.join(__dirname, "uploads"), { recursive: true });
-        }
-
-        await file.mv(uploadPath);
-
-        const mimeType = file.mimetype;
-        const extension = path.extname(uploadPath).toLowerCase();
-
-        if ([".jpeg", ".jpg", ".png", ".gif"].includes(extension)) {
-          options = {
-            image: { url: uploadPath }, // Adjust if sending file path
-            caption: message,
-          };
-        } else if ([".mp3", ".ogg"].includes(extension)) {
-          options = {
-            audio: { url: uploadPath }, // Ensure path is correct
-            mimetype: mimeType,
-            ptt: true,
-          };
-        } else {
-          options = {
-            document: { url: uploadPath },
-            mimetype: mimeType,
-            fileName: file.name,
-            caption: message,
-          };
-        }
-        await sock.sendMessage(exists.jid, options);
-        // Hapus file setelah dikirim
-        fs.unlink(uploadPath, (err) => {
-          if (err) console.error("Error deleting file: ", err);
+    if (!numbers || !Array.isArray(numbers) || numbers.length === 0) {
+        return res.status(400).json({
+            status: false,
+            response: "Daftar nomor WA tidak disertakan!",
         });
-      } else {
-        options = { text: message };
-      }
     }
 
-    res.status(200).json({
-      status: true,
-      response: "Pesan berhasil dikirim ke semua nomor.",
-    });
-  } catch (error) {
-    res.status(500).json({
-      status: false,
-      response: `Failed to send message: ${error.message}`,
-    });
-  }
+    try {
+        if (!isConnected()) {
+            return res.status(500).json({
+                status: false,
+                response: "WhatsApp belum terhubung.",
+            });
+        }
+
+        for (const number of numbers) {
+            const numberWA = `${number}@s.whatsapp.net`;
+            const [exists] = await sock.onWhatsApp(numberWA);
+
+            if (!exists?.jid) {
+                console.warn(`Nomor ${number} tidak terdaftar.`);
+                continue;
+            }
+
+            let options = {};
+
+            if (file) {
+                const uploadPath = path.join(
+                    __dirname,
+                    "uploads",
+                    `${Date.now()}_${file.name}`
+                );
+
+                // Handle File Upload
+
+                // Cek apakah direktori 'uploads' ada
+                if (!fs.existsSync(path.join(__dirname, "uploads"))) {
+                    fs.mkdirSync(path.join(__dirname, "uploads"), {
+                        recursive: true,
+                    });
+                }
+
+                await file.mv(uploadPath);
+
+                const mimeType = file.mimetype;
+                const extension = path.extname(uploadPath).toLowerCase();
+
+                if ([".jpeg", ".jpg", ".png", ".gif"].includes(extension)) {
+                    options = {
+                        image: { url: uploadPath }, // Adjust if sending file path
+                        caption: message,
+                    };
+                } else if ([".mp3", ".ogg"].includes(extension)) {
+                    options = {
+                        audio: { url: uploadPath }, // Ensure path is correct
+                        mimetype: mimeType,
+                        ptt: true,
+                    };
+                } else {
+                    options = {
+                        document: { url: uploadPath },
+                        mimetype: mimeType,
+                        fileName: file.name,
+                        caption: message,
+                    };
+                }
+                await sock.sendMessage(exists.jid, options);
+                // Hapus file setelah dikirim
+                fs.unlink(uploadPath, (err) => {
+                    if (err) console.error("Error deleting file: ", err);
+                });
+            } else {
+                options = { text: message };
+            }
+        }
+
+        res.status(200).json({
+            status: true,
+            response: "Pesan berhasil dikirim ke semua nomor.",
+        });
+    } catch (error) {
+        res.status(500).json({
+            status: false,
+            response: `Failed to send message: ${error.message}`,
+        });
+    }
 });
 
 const PORT = process.env.PORT || 8000;
 
 // Start Express Server
 server.listen(PORT, () => {
-  console.log(`Server running on ${PORT}`);
-  connectToWhatsApp();
+    console.log(`Server running on ${PORT}`);
+    connectToWhatsApp();
 });
